@@ -1,0 +1,13 @@
+node_modules
+
+#Hardhat files
+cache
+artifacts
+.idea
+contracts/.DS_Store
+.DS_Store
+package-lock.json
+package-lock.json
+contracts/Conjure_flat.sol
+contracts/EtherCollateral_flat.sol
+scripts/decoder.js
