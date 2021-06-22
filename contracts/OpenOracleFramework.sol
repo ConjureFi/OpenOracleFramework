@@ -88,7 +88,6 @@ contract OpenOracleFramework {
 
     event contractSetup(address[] signers, uint256 signerThreshold, address payout);
     event feedAdded(string name, string description, uint256 decimal, uint256 timelsot, uint256 feedId, uint256 mode, uint256 price);
-    event feedSubmitted(uint256 feedId, uint256 roundId, uint256 value, uint256 timestamp);
     event feedSigned(uint256 feedId, uint256 roundId, uint256 value, uint256 timestamp, address signer);
     event routerFeeTaken(uint256 value, address sender);
     event feedSupported(uint256 feedId, uint256 supportvalue);
@@ -355,8 +354,6 @@ contract OpenOracleFramework {
                 // process the struct for storing
                 feedList[feedIDs[i]].latestPriceUpdate = block.timestamp;
                 feedList[feedIDs[i]].latestPrice = returnPrice;
-
-                emit feedSubmitted(feedIDs[i], roundNumber, returnPrice, block.timestamp);
             }
         }
     }
