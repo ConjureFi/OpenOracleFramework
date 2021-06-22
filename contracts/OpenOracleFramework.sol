@@ -119,7 +119,6 @@ contract OpenOracleFramework {
         factoryContract = address(1);
     }
 
-
     function initialize(
         address[] memory signers_,
         uint256 signerThreshold_,
@@ -149,6 +148,8 @@ contract OpenOracleFramework {
 
         emit contractSetup(signers_, signerThreshold, payoutAddress);
     }
+
+    //---------------------------helper functions---------------------------
 
     /**
     * @dev implementation of a quicksort algorithm
@@ -188,9 +189,95 @@ contract OpenOracleFramework {
         return data;
     }
 
+    //---------------------------view functions ---------------------------
+
+    /**
+    * @dev getFeeds function lets anyone call the oracle to receive data (maybe pay an optional fee)
+    *
+    * @param feedIDs the array of feedIds
+    */
+    function getFeeds(uint256[] memory feedIDs) external view returns (uint256[] memory, uint256[] memory) {
+
+        uint256 feedLen = feedIDs.length;
+        uint256[] memory returnPrices = new uint256[](feedLen);
+        uint256[] memory returnTimestamps = new uint256[](feedLen);
+
+        for (uint i = 0; i < feedIDs.length; i++) {
+
+            if (subscriptionPassPrice > 0) {
+                if (hasPass[msg.sender] <= block.timestamp) {
+                    if (feedList[feedIDs[i]].revenueMode == 1 && subscribedTo[msg.sender][feedIDs[i]] < block.timestamp) {
+                        revert("No subscription to feed");
+                    }
+                }
+            } else {
+                if (feedList[feedIDs[i]].revenueMode == 1 && subscribedTo[msg.sender][feedIDs[i]] < block.timestamp) {
+                    revert("No subscription to feed");
+                }
+            }
+
+            returnPrices[i] = feedList[feedIDs[i]].latestPrice;
+            returnTimestamps[i] = feedList[feedIDs[i]].latestPriceUpdate;
+        }
+
+        return (returnPrices, returnTimestamps);
+    }
+
+    function getFeedLength() external view returns(uint256){
+        return feedList.length;
+    }
+
+    function getFeedList(uint256[] memory feedIDs) external view returns(string[] memory, uint256[] memory, uint256[] memory, uint256[] memory, uint256[] memory) {
+
+        uint256 feedLen = feedIDs.length;
+        string[] memory returnNames = new string[](feedLen);
+        uint256[] memory returnDecimals = new uint256[](feedLen);
+        uint256[] memory returnTimeslot = new uint256[](feedLen);
+        uint256[] memory returnRevenueMode = new uint256[](feedLen);
+        uint256[] memory returnCost = new uint256[](feedLen);
+
+        for (uint i = 0; i < feedIDs.length; i++) {
+            returnNames[i] = feedList[feedIDs[i]].feedName;
+            returnDecimals[i] = feedList[feedIDs[i]].feedDecimals;
+            returnTimeslot[i] = feedList[feedIDs[i]].feedTimeslot;
+            returnRevenueMode[i] = feedList[feedIDs[i]].revenueMode;
+            returnCost[i] = feedList[feedIDs[i]].feedCost;
+        }
+
+        return (returnNames, returnDecimals, returnTimeslot, returnRevenueMode, returnCost);
+    }
+
+    //---------------------------oracle management functions ---------------------------
+
     // function to withdraw funds
     function withdrawFunds() external {
         payoutAddress.transfer(address(this).balance);
+    }
+
+    function createNewFeeds(string[] memory names, string[] memory descriptions, uint256[] memory decimals, uint256[] memory timeslots, uint256[] memory feedCosts, uint256[] memory revenueModes) onlySigner external {
+        require(names.length == descriptions.length, "Length mismatch");
+        require(descriptions.length == decimals.length, "Length mismatch");
+        require(decimals.length == timeslots.length, "Length mismatch");
+        require(timeslots.length == feedCosts.length, "Length mismatch");
+        require(feedCosts.length == revenueModes.length, "Length mismatch");
+
+        for(uint i = 0; i < names.length; i++) {
+            require(decimals[i] <= 18, "Decimal places too high");
+            require(timeslots[i] > 0, "Timeslot cannot be 0");
+            require(revenueModes[i] <= 1, "Wrong revenueMode parameter");
+
+            feedList.push(oracleStruct({
+            feedName: names[i],
+            feedDecimals: decimals[i],
+            feedTimeslot: timeslots[i],
+            latestPrice: 0,
+            latestPriceUpdate: 0,
+            revenueMode: revenueModes[i],
+            feedCost: feedCosts[i]
+            }));
+
+            emit feedAdded(names[i], descriptions[i], decimals[i], timeslots[i], feedList.length - 1, revenueModes[i], feedCosts[i]);
+        }
     }
 
     /**
@@ -266,146 +353,6 @@ contract OpenOracleFramework {
                 emit feedSubmitted(feedIDs[i], roundNumber, returnPrice, block.timestamp);
             }
         }
-    }
-
-
-    function subscribeToFeed(uint256[] memory feedIDs, uint256[] memory durations, address buyer) payable external {
-        require(feedIDs.length == durations.length, "Length mismatch");
-
-        uint256 total;
-        for (uint i = 0; i < feedIDs.length; i++) {
-            require(feedList[feedIDs[i]].revenueMode == 1, "Donation mode turned on");
-            require(durations[i] >= 3600, "Minimum subscription is 1h");
-
-            subscribedTo[buyer][feedIDs[i]] = block.timestamp.add(durations[i]);
-            total += feedList[feedIDs[i]].feedCost * durations[i] / 3600;
-        }
-
-        // check if enough payment was sent
-        require(msg.value >= total, "Not enough funds sent to cover oracle fees");
-
-        // send feeds to router
-        if (msg.value > 0) {
-            address payable conjureRouter = IConjureFactory(factoryContract).getConjureRouter();
-            IConjureRouter(conjureRouter).deposit{value:msg.value/50}();
-            emit routerFeeTaken(msg.value/50, msg.sender);
-        }
-    }
-
-    function buyPass(address buyer, uint256 duration) payable external {
-        require(subscriptionPassPrice != 0, "Subscription Pass turned off");
-        require(duration >= 3600, "Minimum subscription is 1h");
-        require(msg.value >= subscriptionPassPrice * duration / 86400, "Not enough payment");
-
-        hasPass[buyer] = block.timestamp.add(duration);
-
-        // send feeds to router
-        if (msg.value > 0) {
-            address payable conjureRouter = IConjureFactory(factoryContract).getConjureRouter();
-            IConjureRouter(conjureRouter).deposit{value:msg.value/50}();
-            emit routerFeeTaken(msg.value/50, msg.sender);
-        }
-    }
-
-    /**
-    * @dev getFeeds function lets anyone call the oracle to receive data (maybe pay an optional fee)
-    *
-    * @param feedIDs the array of feedIds
-    */
-    function getFeeds(uint256[] memory feedIDs) external view returns (uint256[] memory, uint256[] memory) {
-
-        uint256 feedLen = feedIDs.length;
-        uint256[] memory returnPrices = new uint256[](feedLen);
-        uint256[] memory returnTimestamps = new uint256[](feedLen);
-
-        for (uint i = 0; i < feedIDs.length; i++) {
-
-            if (subscriptionPassPrice > 0) {
-                if (hasPass[msg.sender] <= block.timestamp) {
-                    if (feedList[feedIDs[i]].revenueMode == 1 && subscribedTo[msg.sender][feedIDs[i]] < block.timestamp) {
-                        revert("No subscription to feed");
-                    }
-                }
-            } else {
-                if (feedList[feedIDs[i]].revenueMode == 1 && subscribedTo[msg.sender][feedIDs[i]] < block.timestamp) {
-                    revert("No subscription to feed");
-                }
-            }
-
-            returnPrices[i] = feedList[feedIDs[i]].latestPrice;
-            returnTimestamps[i] = feedList[feedIDs[i]].latestPriceUpdate;
-        }
-
-        return (returnPrices, returnTimestamps);
-    }
-
-    function getFeedLength() external view returns(uint256){
-        return feedList.length;
-    }
-
-    function getFeedList(uint256[] memory feedIDs) external view returns(string[] memory, uint256[] memory, uint256[] memory, uint256[] memory, uint256[] memory) {
-
-        uint256 feedLen = feedIDs.length;
-        string[] memory returnNames = new string[](feedLen);
-        uint256[] memory returnDecimals = new uint256[](feedLen);
-        uint256[] memory returnTimeslot = new uint256[](feedLen);
-        uint256[] memory returnRevenueMode = new uint256[](feedLen);
-        uint256[] memory returnCost = new uint256[](feedLen);
-
-        for (uint i = 0; i < feedIDs.length; i++) {
-            returnNames[i] = feedList[feedIDs[i]].feedName;
-            returnDecimals[i] = feedList[feedIDs[i]].feedDecimals;
-            returnTimeslot[i] = feedList[feedIDs[i]].feedTimeslot;
-            returnRevenueMode[i] = feedList[feedIDs[i]].revenueMode;
-            returnCost[i] = feedList[feedIDs[i]].feedCost;
-        }
-
-        return (returnNames, returnDecimals, returnTimeslot, returnRevenueMode, returnCost);
-    }
-
-    function createNewFeeds(string[] memory names, string[] memory descriptions, uint256[] memory decimals, uint256[] memory timeslots, uint256[] memory feedCosts, uint256[] memory revenueModes) onlySigner external {
-        require(names.length == descriptions.length, "Length mismatch");
-        require(descriptions.length == decimals.length, "Length mismatch");
-        require(decimals.length == timeslots.length, "Length mismatch");
-        require(timeslots.length == feedCosts.length, "Length mismatch");
-        require(feedCosts.length == revenueModes.length, "Length mismatch");
-
-        for(uint i = 0; i < names.length; i++) {
-            require(decimals[i] <= 18, "Decimal places too high");
-            require(timeslots[i] > 0, "Timeslot cannot be 0");
-            require(revenueModes[i] <= 1, "Wrong revenueMode parameter");
-
-            feedList.push(oracleStruct({
-                feedName: names[i],
-                feedDecimals: decimals[i],
-                feedTimeslot: timeslots[i],
-                latestPrice: 0,
-                latestPriceUpdate: 0,
-                revenueMode: revenueModes[i],
-                feedCost: feedCosts[i]
-            }));
-
-            emit feedAdded(names[i], descriptions[i], decimals[i], timeslots[i], feedList.length - 1, revenueModes[i], feedCosts[i]);
-        }
-    }
-
-    function supportFeeds(uint256[] memory feedIds, uint256[] memory values) payable external {
-        require(feedIds.length == values.length, "Length mismatch");
-
-        uint256 total;
-        for (uint i = 0; i < feedIds.length; i++) {
-            require(feedList[feedIds[i]].revenueMode == 0, "Subscription mode turned on");
-            feedSupport[feedIds[i]] = feedSupport[feedIds[i]].add(values[i]);
-            total += values[i];
-
-            emit feedSupported(feedIds[i], values[i]);
-        }
-
-        require(msg.value >= total, "Msg.value does not meet support values");
-
-        address payable conjureRouter = IConjureFactory(factoryContract).getConjureRouter();
-        IConjureRouter(conjureRouter).deposit{value:total/100}();
-        emit routerFeeTaken(total/100, msg.sender);
     }
 
     function signProposal (uint256 proposalId) onlySigner external {
@@ -538,5 +485,68 @@ contract OpenOracleFramework {
                 emit signerRemoved(toRemove);
             }
         }
+    }
+
+    //---------------------------subscription functions---------------------------
+
+    function subscribeToFeed(uint256[] memory feedIDs, uint256[] memory durations, address buyer) payable external {
+        require(feedIDs.length == durations.length, "Length mismatch");
+
+        uint256 total;
+        for (uint i = 0; i < feedIDs.length; i++) {
+            require(feedList[feedIDs[i]].revenueMode == 1, "Donation mode turned on");
+            require(durations[i] >= 3600, "Minimum subscription is 1h");
+
+            if (subscribedTo[buyer][feedIDs[i]] <=block.timestamp) {
+                subscribedTo[buyer][feedIDs[i]] = block.timestamp.add(durations[i]);
+            } else {
+                subscribedTo[buyer][feedIDs[i]] = subscribedTo[buyer][feedIDs[i]].add(durations[i]);
+            }
+
+            total += feedList[feedIDs[i]].feedCost * durations[i] / 3600;
+        }
+
+        // check if enough payment was sent
+        require(msg.value >= total, "Not enough funds sent to cover oracle fees");
+
+        // send feeds to router
+        address payable conjureRouter = IConjureFactory(factoryContract).getConjureRouter();
+        IConjureRouter(conjureRouter).deposit{value:msg.value/50}();
+        emit routerFeeTaken(msg.value/50, msg.sender);
+    }
+
+    function buyPass(address buyer, uint256 duration) payable external {
+        require(subscriptionPassPrice != 0, "Subscription Pass turned off");
+        require(duration >= 3600, "Minimum subscription is 1h");
+        require(msg.value >= subscriptionPassPrice * duration / 86400, "Not enough payment");
+
+        if (hasPass[buyer] <=block.timestamp) {
+            hasPass[buyer] = block.timestamp.add(duration);
+        } else {
+            hasPass[buyer] = hasPass[buyer].add(duration);
+        }
+
+        address payable conjureRouter = IConjureFactory(factoryContract).getConjureRouter();
+        IConjureRouter(conjureRouter).deposit{value:msg.value/50}();
+        emit routerFeeTaken(msg.value/50, msg.sender);
+    }
+
+    function supportFeeds(uint256[] memory feedIds, uint256[] memory values) payable external {
+        require(feedIds.length == values.length, "Length mismatch");
+
+        uint256 total;
+        for (uint i = 0; i < feedIds.length; i++) {
+            require(feedList[feedIds[i]].revenueMode == 0, "Subscription mode turned on");
+            feedSupport[feedIds[i]] = feedSupport[feedIds[i]].add(values[i]);
+            total += values[i];
+
+            emit feedSupported(feedIds[i], values[i]);
+        }
+
+        require(msg.value >= total, "Msg.value does not meet support values");
+
+        address payable conjureRouter = IConjureFactory(factoryContract).getConjureRouter();
+        IConjureRouter(conjureRouter).deposit{value:total/100}();
+        emit routerFeeTaken(total/100, msg.sender);
     }
 }
