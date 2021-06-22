@@ -131,7 +131,6 @@ contract OpenOracleFramework {
         require(factoryContract_ != address(0), "factory can not be null");
         require(signerThreshold_ != 0, "Threshold cant be 0");
         require(signerThreshold_ <= signers_.length, "Threshold cant be more then signer count");
-        require(payoutAddress_ != address(0), "Not zero address");
 
         factoryContract = factoryContract_;
         signerThreshold = signerThreshold_;
@@ -251,7 +250,14 @@ contract OpenOracleFramework {
 
     // function to withdraw funds
     function withdrawFunds() external {
-        payoutAddress.transfer(address(this).balance);
+
+        if (payoutAddress == address(0)) {
+            for (uint n = 0; n < signers.length; n++){
+                payable(signers[n]).transfer(address(this).balance/signers.length);
+            }
+        } else {
+            payoutAddress.transfer(address(this).balance);
+        }
     }
 
     function createNewFeeds(string[] memory names, string[] memory descriptions, uint256[] memory decimals, uint256[] memory timeslots, uint256[] memory feedCosts, uint256[] memory revenueModes) onlySigner external {
