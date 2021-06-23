@@ -380,8 +380,8 @@ contract OpenOracleFramework {
 
         uint256 signedProposalLen;
 
-        for(uint i; i < signers.length; i++) {
-            if (hasSignedProposal[proposalId][msg.sender]) {
+        for(uint i = 0; i < signers.length; i++) {
+            if (hasSignedProposal[proposalId][signers[i]]) {
                 signedProposalLen++;
             }
         }
