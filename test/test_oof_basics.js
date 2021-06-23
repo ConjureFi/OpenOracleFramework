@@ -98,6 +98,11 @@ describe("OOF Basic Tests", function () {
         [100],
         [0]
     );
+
+    await oof.submitFeed(
+        [500],
+        [1]
+    );
   });
 
   it("Check feed visibility", async function () {
@@ -115,6 +120,20 @@ describe("OOF Basic Tests", function () {
 
     let price = await oof.connect(addr1).getFeeds([0]);
     console.log(price)
+    expect(price[0][0]).to.be.equal(100);
+
+    console.log('in')
+
+    await expect(oof.connect(addr2).getFeeds([0])).to.be.revertedWith("No subscription to feed");
+
+    let pricFree = await oof.connect(addr2).getFeeds([1]);
+    expect(pricFree[0][0]).to.be.equal("500000000000000000000")
+
+    await expect(oof.connect(addr3).getFeeds([0])).to.be.revertedWith("No subscription to feed");
+
+    await oof.connect(addr3).subscribeToFeed([0],[3600],addr3.address,overrides);
+    price = await oof.connect(addr1).getFeeds([0]);
+    expect(price[0][0]).to.be.equal(100)
   });
 
 
