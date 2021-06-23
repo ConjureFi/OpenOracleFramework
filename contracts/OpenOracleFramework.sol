@@ -202,23 +202,39 @@ contract OpenOracleFramework {
 
         for (uint i = 0; i < feedIDs.length; i++) {
 
-            if (subscriptionPassPrice > 0) {
-                if (hasPass[msg.sender] <= block.timestamp) {
-                    if (feedList[feedIDs[i]].revenueMode == 1 && subscribedTo[msg.sender][feedIDs[i]] < block.timestamp) {
-                        revert("No subscription to feed");
-                    }
-                }
-            } else {
-                if (feedList[feedIDs[i]].revenueMode == 1 && subscribedTo[msg.sender][feedIDs[i]] < block.timestamp) {
-                    revert("No subscription to feed");
-                }
-            }
+            (returnPrices[i] ,returnTimestamps[i]) = getFeed(feedIDs[i]);
 
-            returnPrices[i] = feedList[feedIDs[i]].latestPrice;
-            returnTimestamps[i] = feedList[feedIDs[i]].latestPriceUpdate;
         }
 
         return (returnPrices, returnTimestamps);
+    }
+
+    /**
+    * @dev getFeed function lets anyone call the oracle to receive data (maybe pay an optional fee)
+    *
+    * @param feedID the array of feedId
+    */
+    function getFeed(uint256 feedID) public view returns (uint256, uint256) {
+
+        uint256 returnPrice;
+        uint256  returnTimestamp;
+
+        if (subscriptionPassPrice > 0) {
+            if (hasPass[msg.sender] <= block.timestamp) {
+                if (feedList[feedID].revenueMode == 1 && subscribedTo[msg.sender][feedID] < block.timestamp) {
+                    revert("No subscription to feed");
+                }
+            }
+        } else {
+            if (feedList[feedID].revenueMode == 1 && subscribedTo[msg.sender][feedID] < block.timestamp) {
+                revert("No subscription to feed");
+            }
+        }
+
+        returnPrice = feedList[feedID].latestPrice;
+        returnTimestamp = feedList[feedID].latestPriceUpdate;
+
+        return (returnPrice, returnTimestamp);
     }
 
     function getFeedLength() external view returns(uint256){
@@ -312,8 +328,8 @@ contract OpenOracleFramework {
 
             // feed - number and push value
             feedRoundNumberToStructMapping[feedIDs[i]][roundNumber][msg.sender] = feedRoundStruct({
-                value: values[i],
-                timestamp: block.timestamp
+            value: values[i],
+            timestamp: block.timestamp
             });
 
             emit feedSigned(feedIDs[i], roundNumber, values[i], block.timestamp, msg.sender);
