@@ -310,7 +310,7 @@ contract OpenOracleFramework {
     * @param values the array of values
     * @param feedIDs the array of feedIds
     */
-    function submitFeed(uint256[] memory values, uint256[] memory feedIDs) onlySigner external {
+    function submitFeed(uint256[] memory feedIDs, uint256[] memory values) onlySigner external {
         require(values.length == feedIDs.length, "Value length and feedID length do not match");
 
         // process feeds
