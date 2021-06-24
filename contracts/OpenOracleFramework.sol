@@ -464,10 +464,6 @@ contract OpenOracleFramework {
         emit newFeedCost(feedCost, feedId);
     }
 
-    function updateOracleFee(uint256 newFeeValue) private {
-        emit newFee(newFeeValue);
-    }
-
     function updateThreshold(uint256 newThresholdValue) private {
         require(newThresholdValue != 0, "Threshold cant be 0");
         require(newThresholdValue <= signerLength, "Threshold cant be bigger then length of signers");
