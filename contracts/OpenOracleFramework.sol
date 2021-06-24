@@ -194,19 +194,20 @@ contract OpenOracleFramework {
     *
     * @param feedIDs the array of feedIds
     */
-    function getFeeds(uint256[] memory feedIDs) external view returns (uint256[] memory, uint256[] memory) {
+    function getFeeds(uint256[] memory feedIDs) external view returns (uint256[] memory, uint256[] memory, uint256[] memory) {
 
         uint256 feedLen = feedIDs.length;
         uint256[] memory returnPrices = new uint256[](feedLen);
         uint256[] memory returnTimestamps = new uint256[](feedLen);
+        uint256[] memory returnDecimals = new uint256[](feedLen);
 
         for (uint i = 0; i < feedIDs.length; i++) {
 
-            (returnPrices[i] ,returnTimestamps[i]) = getFeed(feedIDs[i]);
+            (returnPrices[i] ,returnTimestamps[i], returnDecimals[i]) = getFeed(feedIDs[i]);
 
         }
 
-        return (returnPrices, returnTimestamps);
+        return (returnPrices, returnTimestamps, returnDecimals);
     }
 
     /**
@@ -214,10 +215,11 @@ contract OpenOracleFramework {
     *
     * @param feedID the array of feedId
     */
-    function getFeed(uint256 feedID) public view returns (uint256, uint256) {
+    function getFeed(uint256 feedID) public view returns (uint256, uint256, uint256) {
 
         uint256 returnPrice;
-        uint256  returnTimestamp;
+        uint256 returnTimestamp;
+        uint256 returnDecimals;
 
         if (subscriptionPassPrice > 0) {
             if (hasPass[msg.sender] <= block.timestamp) {
@@ -233,8 +235,9 @@ contract OpenOracleFramework {
 
         returnPrice = feedList[feedID].latestPrice;
         returnTimestamp = feedList[feedID].latestPriceUpdate;
+        returnDecimals = feedList[feedID].feedDecimals;
 
-        return (returnPrice, returnTimestamp);
+        return (returnPrice, returnTimestamp, returnDecimals);
     }
 
     function getFeedLength() external view returns(uint256){
