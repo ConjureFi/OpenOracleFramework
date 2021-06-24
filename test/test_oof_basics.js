@@ -95,13 +95,13 @@ describe("OOF Basic Tests", function () {
   it("Should be able to submit a feed", async function () {
 
     await oof.submitFeed(
-        [100],
-        [0]
+        [0],
+        [100]
     );
 
     await oof.submitFeed(
-        [500],
-        [1]
+        [1],
+        [500]
     );
   });
 

@@ -34,6 +34,9 @@ contract OpenOracleFramework {
         uint256 timestamp;
     }
 
+    // stores historical values of feeds
+    mapping(uint256 => mapping(uint256 => uint256)) private historicalFeeds;
+
     // indicates if sender is a signer
     mapping(address => bool) private isSigner;
 
@@ -77,6 +80,7 @@ contract OpenOracleFramework {
         // 6 ... feedCost
         uint256 proposalType;
         uint256 proposalFeedId;
+        uint256 proposalActive;
     }
 
     proposalStruct[] public proposalList;
@@ -188,6 +192,34 @@ contract OpenOracleFramework {
     }
 
     //---------------------------view functions ---------------------------
+
+    function getHistoricalFeeds(uint256[] memory feedIDs, uint256[] memory timestamps) external view returns (uint256[] memory) {
+
+        uint256 feedLen = feedIDs.length;
+        uint256[] memory returnPrices = new uint256[](feedLen);
+        require(feedIDs.length == timestamps.length, "Feeds and Timestamps must match");
+
+        for (uint i = 0; i < feedIDs.length; i++) {
+
+            if (subscriptionPassPrice > 0) {
+                if (hasPass[msg.sender] <= block.timestamp) {
+                    if (feedList[feedIDs[i]].revenueMode == 1 && subscribedTo[msg.sender][feedIDs[i]] < block.timestamp) {
+                        revert("No subscription to feed");
+                    }
+                }
+            } else {
+                if (feedList[feedIDs[i]].revenueMode == 1 && subscribedTo[msg.sender][feedIDs[i]] < block.timestamp) {
+                    revert("No subscription to feed");
+                }
+            }
+
+            uint256 roundNumber = timestamps[i] / feedList[feedIDs[i]].feedTimeslot;
+            returnPrices[i] =  historicalFeeds[feedIDs[i]][roundNumber];
+        }
+
+        return (returnPrices);
+    }
+
 
     /**
     * @dev getFeeds function lets anyone call the oracle to receive data (maybe pay an optional fee)
@@ -371,13 +403,18 @@ contract OpenOracleFramework {
                 }
 
                 // process the struct for storing
+                if (block.timestamp / feedList[feedIDs[i]].feedTimeslot > feedList[feedIDs[i]].latestPriceUpdate / feedList[feedIDs[i]].feedTimeslot) {
+                    historicalFeeds[feedIDs[i]][feedList[feedIDs[i]].latestPriceUpdate / feedList[feedIDs[i]].feedTimeslot] = feedList[feedIDs[i]].latestPrice;
+                }
                 feedList[feedIDs[i]].latestPriceUpdate = block.timestamp;
                 feedList[feedIDs[i]].latestPrice = returnPrice;
             }
         }
     }
 
-    function signProposal (uint256 proposalId) onlySigner external {
+    function signProposal(uint256 proposalId) onlySigner external {
+        require(proposalList[proposalId].proposalActive != 0, "Proposal not active");
+
         hasSignedProposal[proposalId][msg.sender] = true;
         emit proposalSigned(proposalId, msg.sender);
 
@@ -406,6 +443,9 @@ contract OpenOracleFramework {
             } else {
                 updateFeedCost(proposalList[proposalId].uintValue, proposalList[proposalId].proposalFeedId);
             }
+
+            // lock proposal
+            proposalList[proposalId].proposalActive = 0;
         }
     }
 
@@ -420,7 +460,8 @@ contract OpenOracleFramework {
             addressValue: address(0),
             proposer: msg.sender,
             proposalType: proposalType,
-            proposalFeedId: 0
+            proposalFeedId: 0,
+            proposalActive: 1
             }));
         } else if (proposalType == 5 || proposalType == 6) {
             proposalList.push(proposalStruct({
@@ -428,7 +469,8 @@ contract OpenOracleFramework {
             addressValue: address(0),
             proposer: msg.sender,
             proposalType: proposalType,
-            proposalFeedId : feedId
+            proposalFeedId : feedId,
+            proposalActive: 1
             }));
         } else {
             proposalList.push(proposalStruct({
@@ -436,7 +478,8 @@ contract OpenOracleFramework {
             addressValue: addressValue,
             proposer: msg.sender,
             proposalType: proposalType,
-            proposalFeedId : 0
+            proposalFeedId : 0,
+            proposalActive: 1
             }));
         }
 
@@ -493,6 +536,7 @@ contract OpenOracleFramework {
     }
 
     function removeSigner(address toRemove) internal {
+        require(isSigner[toRemove], "Address to remove has to be a signer");
         require(signers.length -1 >= signerThreshold, "Less signers than threshold");
 
         for (uint i = 0; i < signers.length; i++) {
