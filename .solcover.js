@@ -6,5 +6,9 @@ module.exports = {
   skipFiles: [
     'lib/',
     'interfaces/',
+      'Alchemize.sol',
+      'AlchemizeFactory.sol',
+      'ConjureRouter.sol',
+      'OpenOracleFrameworkLight.sol'
   ]
 }

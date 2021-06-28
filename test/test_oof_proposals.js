@@ -164,9 +164,6 @@ describe("OOF Proposal Tests", function () {
     // try to remove a signer
     await oof.createProposal(0, addr1.address, 3, 0);
 
-    let len = await oof.signerThreshold()
-    let len2 = await oof.signerLength()
-
     await oof.connect(addr1).signProposal(7)
     await oof.connect(addr2).signProposal(7)
 
@@ -183,7 +180,21 @@ describe("OOF Proposal Tests", function () {
     // try to remove a non signer
     await oof.createProposal(0, addr3.address, 3, 0);
 
+
+
     await expect(oof.connect(addr4).signProposal(9)).to.be.revertedWith("Address to remove has to be a signer")
+
+    //get len before
+    let lenbefore = await oof.signerLength()
+
+    // try to remove a signer
+    await oof.createProposal(0, addr2.address, 3, 0);
+    await oof.connect(addr4).signProposal(10)
+
+    //get len after
+    let lenafter = await oof.signerLength()
+
+    expect(lenafter).to.be.equal(lenbefore-1)
   });
 
   it("Create and Test new payout address", async function () {
@@ -194,7 +205,7 @@ describe("OOF Proposal Tests", function () {
     expect(payoutAddress).to.be.equal(owner.address)
 
     //sign
-    await oof.connect(addr1).signProposal(10);
+    await oof.connect(addr1).signProposal(11);
 
     payoutAddress = await oof.payoutAddress()
     expect(payoutAddress).to.be.equal(addr1.address)
@@ -206,13 +217,13 @@ describe("OOF Proposal Tests", function () {
     await oof.createProposal(2, zeroaddress, 5, 0);
 
     //sign
-    await expect(oof.connect(addr1).signProposal(11)).to.be.revertedWith("Invalid argument for revenue Mode");
+    await expect(oof.connect(addr1).signProposal(12)).to.be.revertedWith("Invalid argument for revenue Mode");
 
     // create proposal for new rev mode
     await oof.createProposal(0, zeroaddress, 5, 0);
 
     //sign
-    await expect(oof.connect(addr1).signProposal(12)).to.be.reverted
+    await expect(oof.connect(addr1).signProposal(13)).to.be.reverted
 
     // create feeds
     await oof.createNewFeeds(
@@ -231,7 +242,7 @@ describe("OOF Proposal Tests", function () {
     await oof.createProposal(0, zeroaddress, 5, 0);
 
     //sign
-    await oof.connect(addr1).signProposal(13);
+    await oof.connect(addr1).signProposal(14);
 
     revmode = await oof.getFeedList([0])
     expect(revmode[3][0]).to.be.equal(0)
@@ -243,7 +254,7 @@ describe("OOF Proposal Tests", function () {
     await oof.createProposal(0, zeroaddress, 6, 0);
 
     //sign
-    await expect(oof.connect(addr1).signProposal(14)).to.be.revertedWith("Feed price cant be 0");
+    await expect(oof.connect(addr1).signProposal(15)).to.be.revertedWith("Feed price cant be 0");
 
     // create proposal for new feed cost
     await oof.createProposal("500000000000000", zeroaddress, 6, 0);
@@ -252,7 +263,7 @@ describe("OOF Proposal Tests", function () {
     expect(feedCost[4][0]).to.be.equal("100000000000000")
 
     //sign
-    await oof.connect(addr1).signProposal(15);
+    await oof.connect(addr1).signProposal(16);
 
     feedCost = await oof.getFeedList([0])
     expect(feedCost[4][0]).to.be.equal("500000000000000")

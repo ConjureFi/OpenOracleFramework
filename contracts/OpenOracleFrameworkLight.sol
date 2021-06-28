@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IConjureFactory.sol";
 import "./interfaces/IConjureRouter.sol";
 
-contract OpenOracleFramework {
+contract OpenOracleFrameworkLight {
 
     // using Openzeppelin contracts for SafeMath and Address
     using SafeMath for uint256;
@@ -28,23 +28,20 @@ contract OpenOracleFramework {
     // threshold which has to be reached
     uint256 public signerThreshold;
 
-    // struct to keep the values for each individual round
-    struct feedRoundStruct {
+    // struct to keep the values for each signer
+    struct feedSignerStruct {
         uint256 value;
         uint256 timestamp;
     }
 
-    // stores historical values of feeds
-    mapping(uint256 => mapping(uint256 => uint256)) private historicalFeeds;
-
     // indicates if sender is a signer
     mapping(address => bool) private isSigner;
 
-    // mapping to store the actual submitted values per FeedId, per round number
-    mapping(uint256 => mapping(uint256 => mapping(address => feedRoundStruct))) private feedRoundNumberToStructMapping;
+    // mapping to store the actual submitted values per FeedId
+    mapping(uint256 => mapping(address => feedSignerStruct)) private feedToStructMapping;
 
     // indicates support of feeds
-    mapping(uint256 => uint256) public feedSupport;
+    mapping(uint256 => uint256) private feedSupport;
 
     // indicates if address si subscribed to a feed
     mapping(address => mapping(uint256 => uint256)) private subscribedTo;
@@ -92,7 +89,7 @@ contract OpenOracleFramework {
 
     event contractSetup(address[] signers, uint256 signerThreshold, address payout);
     event feedAdded(string name, string description, uint256 decimal, uint256 timelsot, uint256 feedId, uint256 mode, uint256 price);
-    event feedSigned(uint256 feedId, uint256 roundId, uint256 value, uint256 timestamp, address signer);
+    event feedSigned(uint256 feedId, uint256 value, uint256 timestamp, address signer);
     event routerFeeTaken(uint256 value, address sender);
     event feedSupported(uint256 feedId, uint256 supportvalue);
     event newProposal(uint256 proposalId, uint256 uintValue, address addressValue, uint256 oracleType, address proposer);
@@ -193,34 +190,6 @@ contract OpenOracleFramework {
 
     //---------------------------view functions ---------------------------
 
-    function getHistoricalFeeds(uint256[] memory feedIDs, uint256[] memory timestamps) external view returns (uint256[] memory) {
-
-        uint256 feedLen = feedIDs.length;
-        uint256[] memory returnPrices = new uint256[](feedLen);
-        require(feedIDs.length == timestamps.length, "Feeds and Timestamps must match");
-
-        for (uint i = 0; i < feedIDs.length; i++) {
-
-            if (subscriptionPassPrice > 0) {
-                if (hasPass[msg.sender] <= block.timestamp) {
-                    if (feedList[feedIDs[i]].revenueMode == 1 && subscribedTo[msg.sender][feedIDs[i]] < block.timestamp) {
-                        revert("No subscription to feed");
-                    }
-                }
-            } else {
-                if (feedList[feedIDs[i]].revenueMode == 1 && subscribedTo[msg.sender][feedIDs[i]] < block.timestamp) {
-                    revert("No subscription to feed");
-                }
-            }
-
-            uint256 roundNumber = timestamps[i] / feedList[feedIDs[i]].feedTimeslot;
-            returnPrices[i] =  historicalFeeds[feedIDs[i]][roundNumber];
-        }
-
-        return (returnPrices);
-    }
-
-
     /**
     * @dev getFeeds function lets anyone call the oracle to receive data (maybe pay an optional fee)
     *
@@ -234,7 +203,9 @@ contract OpenOracleFramework {
         uint256[] memory returnDecimals = new uint256[](feedLen);
 
         for (uint i = 0; i < feedIDs.length; i++) {
+
             (returnPrices[i] ,returnTimestamps[i], returnDecimals[i]) = getFeed(feedIDs[i]);
+
         }
 
         return (returnPrices, returnTimestamps, returnDecimals);
@@ -345,13 +316,6 @@ contract OpenOracleFramework {
 
         // process feeds
         for (uint i = 0; i < values.length; i++) {
-            // get current round number for feed
-            uint256 roundNumber = block.timestamp / feedList[feedIDs[i]].feedTimeslot;
-
-            // check if the signer already pushed an update for the given period
-            if (feedRoundNumberToStructMapping[feedIDs[i]][roundNumber][msg.sender].timestamp != 0) {
-                delete feedRoundNumberToStructMapping[feedIDs[i]][roundNumber][msg.sender];
-            }
 
             // check for decimals
             // norming price
@@ -360,12 +324,13 @@ contract OpenOracleFramework {
             }
 
             // feed - number and push value
-            feedRoundNumberToStructMapping[feedIDs[i]][roundNumber][msg.sender] = feedRoundStruct({
-            value: values[i],
-            timestamp: block.timestamp
+                feedToStructMapping[feedIDs[i]][msg.sender] = feedSignerStruct({
+                value: values[i],
+                timestamp: block.timestamp
             });
 
-            emit feedSigned(feedIDs[i], roundNumber, values[i], block.timestamp, msg.sender);
+            emit feedSigned(feedIDs[i], values[i], block.timestamp, msg.sender);
+
 
             // check if threshold was met
             uint256 signedFeedsLen;
@@ -373,9 +338,9 @@ contract OpenOracleFramework {
             uint256 k;
 
             for (uint j = 0; j < signers.length; j++) {
-                if (feedRoundNumberToStructMapping[feedIDs[i]][roundNumber][signers[j]].timestamp != 0) {
+                if ((feedToStructMapping[feedIDs[i]][signers[j]].timestamp / feedList[feedIDs[i]].feedTimeslot) == (block.timestamp / feedList[feedIDs[i]].feedTimeslot)) {
                     signedFeedsLen++;
-                    prices[k++] = feedRoundNumberToStructMapping[feedIDs[i]][roundNumber][signers[j]].value;
+                    prices[k++] = feedToStructMapping[feedIDs[i]][signers[j]].value;
                 }
             }
 
@@ -400,10 +365,6 @@ contract OpenOracleFramework {
                     returnPrice =  (sorted[size1-1]+sorted[size1])/2;
                 }
 
-                // process the struct for storing
-                if (block.timestamp / feedList[feedIDs[i]].feedTimeslot > feedList[feedIDs[i]].latestPriceUpdate / feedList[feedIDs[i]].feedTimeslot) {
-                    historicalFeeds[feedIDs[i]][feedList[feedIDs[i]].latestPriceUpdate / feedList[feedIDs[i]].feedTimeslot] = feedList[feedIDs[i]].latestPrice;
-                }
                 feedList[feedIDs[i]].latestPriceUpdate = block.timestamp;
                 feedList[feedIDs[i]].latestPrice = returnPrice;
             }
