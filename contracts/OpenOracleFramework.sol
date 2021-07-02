@@ -87,9 +87,6 @@ contract OpenOracleFramework {
 
     mapping(uint256 => mapping(address => bool)) private hasSignedProposal;
 
-    // maximum decimal size for the used prices
-    uint256 private constant MAXIMUM_DECIMALS = 18;
-
     event contractSetup(address[] signers, uint256 signerThreshold, address payout);
     event feedAdded(string name, string description, uint256 decimal, uint256 timelsot, uint256 feedId, uint256 mode, uint256 price);
     event feedSigned(uint256 feedId, uint256 roundId, uint256 value, uint256 timestamp, address signer);
@@ -351,12 +348,6 @@ contract OpenOracleFramework {
             // check if the signer already pushed an update for the given period
             if (feedRoundNumberToStructMapping[feedIDs[i]][roundNumber][msg.sender].timestamp != 0) {
                 delete feedRoundNumberToStructMapping[feedIDs[i]][roundNumber][msg.sender];
-            }
-
-            // check for decimals
-            // norming price
-            if (MAXIMUM_DECIMALS != feedList[feedIDs[i]].feedDecimals) {
-                values[i] = values[i] * 10 ** (MAXIMUM_DECIMALS - feedList[feedIDs[i]].feedDecimals);
             }
 
             // feed - number and push value
