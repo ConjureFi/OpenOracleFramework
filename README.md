@@ -23,6 +23,6 @@ payoutAddress_ (address) - Can be 0x0, in which case the fees will be split accr
 
 subscriptionPassPrice_ (uint256) - The price to purchase a subscription for 28 days to all oracle feeds
 
-###3. https://github.com/ConjureFi/OOFNode to setup the node
+### 3. https://github.com/ConjureFi/OOFNode to setup the node
 
 ### 4. You're all done, you're now providing onchain feeds using your own custom oracle!
