@@ -88,7 +88,7 @@ contract OpenOracleFramework {
     mapping(uint256 => mapping(address => bool)) private hasSignedProposal;
 
     event contractSetup(address[] signers, uint256 signerThreshold, address payout);
-    event feedAdded(string name, string description, uint256 decimal, uint256 timelsot, uint256 feedId, uint256 mode, uint256 price);
+    event feedAdded(string name, string description, uint256 decimal, uint256 timeslot, uint256 feedId, uint256 mode, uint256 price);
     event feedSigned(uint256 feedId, uint256 roundId, uint256 value, uint256 timestamp, address signer);
     event routerFeeTaken(uint256 value, address sender);
     event feedSupported(uint256 feedId, uint256 supportvalue);
