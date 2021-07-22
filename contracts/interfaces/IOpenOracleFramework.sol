@@ -45,9 +45,16 @@ interface IOpenOracleFramework {
     */
     function getFeed(uint256 feedID) external view returns (uint256, uint256, uint256);
 
+    /**
+    * @dev getFeedList function returns the metadata of a feed
+    *
+    * @param feedIDs the array of feedId
+    */
     function getFeedList(uint256[] memory feedIDs) external view returns(string[] memory, uint256[] memory, uint256[] memory, uint256[] memory, uint256[] memory);
 
-    // function to withdraw funds
+    /**
+    * @dev withdrawFunds function sends the collected fees to the given address
+    */
     function withdrawFunds() external;
 
     function createNewFeeds(string[] memory names, string[] memory descriptions, uint256[] memory decimals, uint256[] memory timeslots, uint256[] memory feedCosts, uint256[] memory revenueModes) external;
