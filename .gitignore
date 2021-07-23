@@ -49,3 +49,5 @@ hardhat.config.js
 scripts/deploy_Alchemize.js
 /coverage/
 coverage.json
+hardhat.config.js
+scripts/deploy_OOFTWAP.js
